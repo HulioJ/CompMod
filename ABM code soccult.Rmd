@@ -5,12 +5,14 @@ output: html_document
 
 ```{r setup, include=FALSE}
 
-#pacman::p_load(ggplot2, dplyr, ggpubr, lme4, wesanderson, haven, car, scales, psycho, MuMIn, brms, dagitty, rethinking, patchwork, tidybayes, cmdstanr)
+# LOAD PACKAGES 
+
+pacman::p_load(ggplot2, dplyr, ggpubr, lme4, wesanderson, haven, car, scales, psycho, MuMIn,   brms, dagitty, rethinking, patchwork, tidybayes, cmdstanr)
 
 ```
 
 
-##PLOT FUNCTIONS### 
+### PLOT FUNCTIONS ### 
 
 
 ```{r}
@@ -43,10 +45,7 @@ plot_multiple_runs_O <- function(data_model) {
 
 
 
-
-
 ##### NORMAL MODEL #####
-
 
 
 
@@ -59,36 +58,36 @@ simplemodel  <- function(N, t_max, r_max, energypenalty, mean, sd) {
 
   
   # Create output tibble
-  output <- tibble(generation = rep(1:t_max, r_max),
-                   run = as.factor(rep(1:r_max, each = t_max)),
-                   O = as.numeric(rep(NA, t_max * r_max)), 
-                   W = as.numeric(rep(NA, t_max * r_max)),
-                   M = as.numeric(rep(NA, t_max * r_max)),
-                   B = as.numeric(rep(NA, t_max * r_max)),
-                   S = as.numeric(rep(NA, t_max*r_max)),
-                   E = as.numeric(rep(NA, t_max * r_max)),
-                   sd = as.numeric(rep(NA, t_max*r_max)))
   
-
-  
-  
+    output <- tibble(generation = rep(1:t_max, r_max),
+                     run = as.factor(rep(1:r_max, each = t_max)),
+                     O = as.numeric(rep(NA, t_max * r_max)), 
+                     W = as.numeric(rep(NA, t_max * r_max)),
+                     M = as.numeric(rep(NA, t_max * r_max)),
+                     B = as.numeric(rep(NA, t_max * r_max)),
+                     S = as.numeric(rep(NA, t_max*r_max)),
+                     E = as.numeric(rep(NA, t_max * r_max)),
+                     sd = as.numeric(rep(NA, t_max*r_max)))
+    
   for (r in 1:r_max) {
     
     # Create a population. replace = t means they can have same openness
-    population <- tibble(behaviour = ((sample(10:100, N, replace = TRUE))/100),
-                         free_enrg = rep(NA, N),
-                         change = rep(NA,N),
-                         openness = (rnorm(1000, mean, sd)),
-                         fitness = rep(NA, N),
-                         copyprob = rep(NA, N),
-                         status = rep(1,N),
-                         group = rep(NA,N),
-                         meanopenness = rep(NA,N))
+    
+        population <- tibble(behaviour = ((sample(10:100, N, replace = TRUE))/100),
+                             free_enrg = rep(NA, N),
+                             change = rep(NA,N),
+                             openness = (rnorm(1000, mean, sd)),
+                             fitness = rep(NA, N),
+                             copyprob = rep(NA, N),
+                             status = rep(1,N),
+                             group = rep(NA,N),
+                             meanopenness = rep(NA,N))
     
     
     # Initialise the environment and entropy
-    E <- (sample(10:100,1)/100)
-    S <- (1)
+        
+        E <- (sample(10:100,1)/100)
+        S <- (1)
   
 
   for (t in 1:t_max) {
@@ -96,131 +95,127 @@ simplemodel  <- function(N, t_max, r_max, energypenalty, mean, sd) {
      options(dplyr.summarise.inform = FALSE)
     
     
-    #####MEETING IN GROUPS######
+    ##### MEETING IN GROUPS #####
     
-   population$group <- rep(1:(N/5), times = 5)
-   
+     population$group <- rep(1:(N/5), times = 5)
   
   
-    ##OPENNESS CHANGE####
+    ## OPENNESS CHANGE ###
   
     
      groupmean <- population %>% group_by(group) %>% summarise(meanopenness = mean(openness)) 
       
      groupmeans <- rep(groupmean$meanopenness, times = 5) #again, 5 is group size here
 
-    population$meanopenness <- groupmeans
+     population$meanopenness <- groupmeans
       
-      population$opendirection <- ifelse(population$openness > population$meanopenness, -1, 1)
+     population$opendirection <- ifelse(population$openness > population$meanopenness, -1, 1)
       
      population$openness <- population$openness+((population$openness*(sample(0:100, 1)/1000))*population$opendirection)
 
     
-      ##### 1. 
+  ##### 1. 
+     
      # CHANGING BEHAVIOR AFTER ENVIRONMENT 
-      population$free_enrg <- sqrt((E - population$behaviour)^2)
-      
-      population$change <- sqrt((population$free_enrg * population$openness)^2)
-      
-      population$previous_behaviour <- population$behaviour
+     
+        population$free_enrg <- sqrt((E - population$behaviour)^2)
+        
+        population$change <- sqrt((population$free_enrg * population$openness)^2)
+        
+        population$previous_behaviour <- population$behaviour
 
-    ####NEW BEHAVIOR MOVING TOWARD ENVIRONMET
+     ####NEW BEHAVIOR MOVING TOWARD ENVIRONMET
       
-     population$direction <- ifelse(population$previous_behaviour > E, -1, 1)
+        population$direction <- ifelse(population$previous_behaviour > E, -1, 1)
+    
+        population$behaviour <- population$previous_behaviour +  population$change*population$direction
+        
+        population$upddiff <- sqrt((E - population$behaviour)^2)/100
+        
 
-    population$behaviour <- population$previous_behaviour +  population$change*population$direction
-    
-    
-    population$upddiff <- sqrt((E - population$behaviour)^2)/100
-    
-
- 
-    
      
   # 2.   CALCULATE FITNESS
 
        
-  population$fitness <- 1
+      population$fitness <- 1
   
-  #energypentalty relative to outer entropy
+    #energypentalty relative to outer entropy
   
- P <- energypenalty+(energypenalty*(S/100))
-  
-    population$free_enrg <- population$free_enrg/100
-   population$change <- population$change/100
-  
+      P <- energypenalty+(energypenalty*(S/100))
+    
+      population$free_enrg <- population$free_enrg/100
+      population$change <- population$change/100
+    
     #penalty for prediction error
-  population$fitness <- population$fitness - (population$free_enrg*P)
-  #penalty for energy for changing
-  population$fitness <- population$fitness - (population$change*P)
-  #penalty for updated difference
-   population$fitness <-  population$fitness - (population$upddiff*P)
+      
+      population$fitness <- population$fitness - (population$free_enrg*P)
+   
+    #penalty for energy for changing
+     
+      population$fitness <- population$fitness - (population$change*P)
   
-
-  
+    #penalty for updated difference
+      
+      population$fitness <-  population$fitness - (population$upddiff*P)
+      
+      
+      
     
    #controlling for negative fitnesses
    
-  population$fitness <-  ifelse(population$fitness<0, 0, population$fitness)
-  population$fitness <-  population$fitness+1
+      population$fitness <-  ifelse(population$fitness<0, 0, population$fitness)
+      population$fitness <-  population$fitness+1
   
   
-  
-  
-  
-   ##status
-x = 1
-result <- vector(length=length(population$behaviour))
-for (num in population$behaviour) {
-result[x] <- sum(population$behaviour == num)
-x <- x + 1 
-}
-    
-population$status <- result
-
-population$status <- population$status/10
-#Status penalty for mental illness/rigidity/social iso
-
-population$status <- population$status-(1-population$openness)
-population$status <- ifelse(population$status<0, 0, population$status)
-
-
-
-
 
   
+   ## status
+      
+      x = 1
+      result <- vector(length=length(population$behaviour))
+      for (num in population$behaviour) {
+      result[x] <- sum(population$behaviour == num)
+      x <- x + 1 
+      }
+          
+      population$status <- result
+
+      population$status <- population$status/10
+      
+  #Status penalty for mental illness/rigidity/social iso
+
+      population$status <- population$status-(1-population$openness)
+      population$status <- ifelse(population$status<0, 0, population$status)
+      
   
    # 4. Store population characteristics in output
       
-      output[output$generation == t & output$run == r, ]$W <-mean(population$fitness)
-      output[output$generation == t & output$run == r, ]$O <- mean(population$openness)
-      output[output$generation == t & output$run == r, ]$M <- E - mean(population$behaviour)
-      output[output$generation == t & output$run == r, ]$B <- mean(population$behaviour)
-      output[output$generation == t & output$run == r, ]$S <- S
-      output[output$generation == t & output$run == r, ]$E <- E
-      output[output$generation == t & output$run == r, ]$sd <- sd(population$openness)
- 
+        output[output$generation == t & output$run == r, ]$W <-mean(population$fitness)
+        output[output$generation == t & output$run == r, ]$O <- mean(population$openness)
+        output[output$generation == t & output$run == r, ]$M <- E - mean(population$behaviour)
+        output[output$generation == t & output$run == r, ]$B <- mean(population$behaviour)
+        output[output$generation == t & output$run == r, ]$S <- S
+        output[output$generation == t & output$run == r, ]$E <- E
+        output[output$generation == t & output$run == r, ]$sd <- sd(population$openness)
+   
      
+    # 5. REPRODUCTION
       
-      
-      # 5. REPRODUCTION
-      
-      previous_population <- population
+        previous_population <- population
       
     
       #copy behaviour based on fitness and status <3 yay
       
-      population$openness <- 
-      sample(previous_population$openness, size = N, replace = TRUE, prob = previous_population$fitness)
-      
+        population$openness <- 
+        sample(previous_population$openness, size = N, replace = TRUE, prob = previous_population$fitness)
+        
   
-
-      #behaviour replication
+      # behavior replication
       
-      previous_population$copyprob <- previous_population$fitness+previous_population$status
-
-      population$behaviour <- 
-      sample(previous_population$behaviour, size = N, replace = T, prob = previous_population$copyprob)
+        previous_population$copyprob <- previous_population$fitness+previous_population$status
+  
+        population$behaviour <- 
+        sample(previous_population$behaviour, size = N, replace = T, prob = previous_population$copyprob)
 
       
      
@@ -229,9 +224,10 @@ population$status <- ifelse(population$status<0, 0, population$status)
       
       
 
-      # 6. Potential environmental change
-     E <- E + 1
-     S <- S+(0.5*E)
+      # 6. Environmental change
+      
+       E <- E + 1
+       S <- S+(0.5*E)
       
   }
   
@@ -241,7 +237,7 @@ population$status <- ifelse(population$status<0, 0, population$status)
 }
 
 
-normal_data <- simplemodel(N = 1000, t_max = 50, r_max = 50, energypenalty = 1, mean = 0.375, sd = 0.07)
+normal_data <- simplemodel(N = 1000, t_max = 50, r_max = 50, energypenalty = 1, mean = 0.37, sd = 0.07)
 
 
 ```
@@ -257,7 +253,6 @@ normal_data <- simplemodel(N = 1000, t_max = 50, r_max = 50, energypenalty = 1, 
 
 ##importing dataset
 
-
   path = file.path("/Users/julia/Documents/CogSci/cogcomp/soccom", "NEO_PIR.sav")
   NEO = read_sav(path)
 
@@ -272,7 +267,7 @@ normal_data <- simplemodel(N = 1000, t_max = 50, r_max = 50, energypenalty = 1, 
   single_runmodel <- function(N, t_max, energypenalty, mean, sd, cE, cS) {
 
 
-    lastpop <- tibble(p = as.numeric(1:N, N),
+  lastpop <- tibble(p = as.numeric(1:N, N),
                     openness = as.numeric(rep(NA, N)),
                     entropy = as.numeric(rep(NA, N)))
     
@@ -292,21 +287,17 @@ normal_data <- simplemodel(N = 1000, t_max = 50, r_max = 50, energypenalty = 1, 
       
       
       # Initialise the environment and entropy
-      E <- (sample(10:100,1)/100)
-      S <- (1)
-  
-       options(dplyr.summarise.inform = FALSE)
+     
+        E <- (sample(10:100,1)/100)
+        S <- (1)
+    
+        options(dplyr.summarise.inform = FALSE)
       
-      
-      
-   
       
       #####MEETING IN GROUPS######
       
-     population$group <- rep(1:(N/5), times = 5)
+       population$group <- rep(1:(N/5), times = 5)
      
-    
-    
       ##OPENNESS CHANGE####
     
       
@@ -314,61 +305,66 @@ normal_data <- simplemodel(N = 1000, t_max = 50, r_max = 50, energypenalty = 1, 
         
        groupmeans <- rep(groupmean$meanopenness, times = 5) #again, 5 is group size here
   
-      population$meanopenness <- groupmeans
+       population$meanopenness <- groupmeans
         
-        population$opendirection <- ifelse(population$openness > population$meanopenness, -1, 1)
+       population$opendirection <- ifelse(population$openness > population$meanopenness, -1, 1)
         
        population$openness <- population$openness+((population$openness*(sample(0:100, 1)/1000))*population$opendirection)
   
       
-        ##### 1. 
+   ##### 1. 
        # CHANGING BEHAVIOR AFTER ENVIRONMENT 
+        
         population$free_enrg <- sqrt((E - population$behaviour)^2)
         
         population$change <- sqrt((population$free_enrg * population$openness)^2)
         
         population$previous_behaviour <- population$behaviour
   
-      ####NEW BEHAVIOR MOVING TOWARD ENVIRONMET
+      # NEW BEHAVIOR MOVING TOWARD ENVIRONMENT
         
        population$direction <- ifelse(population$previous_behaviour > E, -1, 1)
   
-      population$behaviour <- population$previous_behaviour + population$change*population$direction
+       population$behaviour <- population$previous_behaviour + population$change*population$direction
       
       
-      population$upddiff <- sqrt((E - population$behaviour)^2)/100
+       population$upddiff <- sqrt((E - population$behaviour)^2)/100
       
   
-    # 2.   CALCULATE FITNESS
+  #2. CALCULATE FITNESS
   
          
-    population$fitness <- 1
+      population$fitness <- 1
     
     #energypentalty relative to outer entropy
     
-   P <- energypenalty+(energypenalty*(S/100))
-    
-      population$free_enrg <- population$free_enrg/100
-     population$change <- population$change/100
-    
-      #penalty for prediction error
-    population$fitness <- population$fitness - (population$free_enrg*P)
-    #penalty for energy for changing
-    population$fitness <- population$fitness - (population$change*P)
-    #penalty for updated difference
-     population$fitness <-  population$fitness - (population$upddiff*P)
-    
-  
-    
+      P <- energypenalty+(energypenalty*(S/100))
       
-     #controlling for negative fitnesses
+      population$free_enrg <- population$free_enrg/100
+      population$change <- population$change/100
+      
+    #penalty for prediction error
+    
+       population$fitness <- population$fitness - (population$free_enrg*P)
+   
+     #penalty for energy for changing
+   
+       population$fitness <- population$fitness - (population$change*P)
+   
+     #penalty for updated difference
+   
+       population$fitness <-  population$fitness - (population$upddiff*P)
+    
+    
+    #controlling for negative fitnesses
      
-    population$fitness <-  ifelse(population$fitness<0, 0, population$fitness)
-     population$fitness <-  population$fitness + 1
+        population$fitness <-  ifelse(population$fitness<0, 0, population$fitness)
+        population$fitness <-  population$fitness + 1
     
     
   
      ##status
+        
         x = 1
         result <- vector(length=length(population$behaviour))
         for (num in population$behaviour) {
@@ -379,6 +375,7 @@ normal_data <- simplemodel(N = 1000, t_max = 50, r_max = 50, energypenalty = 1, 
         population$status <- result
         
         population$status <- population$status/10
+        
       #Status penalty for mental illness/rigidity/social iso
   
         population$status <-population$status-(1-population$openness)
@@ -388,23 +385,21 @@ normal_data <- simplemodel(N = 1000, t_max = 50, r_max = 50, energypenalty = 1, 
   
      # 4. Store population characteristics in output
   
-         lastpop$openness <- population$openness
-         lastpop$entropy <- S
-    
+        lastpop$openness <- population$openness
+        lastpop$entropy <- S
     
         
         
-     # 5. REPRODUCTION
+    # 5. REPRODUCTION
         
         previous_population <- population
-        
+         
       
         #copy behaviour based on fitness and status <3 yay
         
-            population$openness <- 
-            sample(previous_population$openness, size = N, replace = TRUE, prob =    previous_population$fitness)
+         population$openness <- 
+         sample(previous_population$openness, size = N, replace = TRUE, prob =    previous_population$fitness)
         
-    
   
         #behaviour replication
         
@@ -420,10 +415,10 @@ normal_data <- simplemodel(N = 1000, t_max = 50, r_max = 50, energypenalty = 1, 
         
         
   
-        # 6. Potential environmental change
-       E <- E + cE
-       S <- S+(cS*E)
-     
+    # 6. Environmental change
+        
+         E <- E + cE
+         S <- S+(cS*E)
    
       
   }
@@ -468,7 +463,7 @@ singlerun <- single_runmodel(N = 1000, t_max = 50, energypenalty = 1, mean = 0.3
 
 
 ```{r pressure, echo=FALSE}
-citation("brms")
+
 set.seed(8675309)
 
 hyp1  <- function(N, t_max, r_max, energypenalty, mean, sd) {
@@ -504,10 +499,11 @@ hyp1  <- function(N, t_max, r_max, energypenalty, mean, sd) {
     
     
     # Initialise the environment and entropy
-    E <- (sample(10:100,1)/100)
-    S <- (1)
-    run <-1
-  
+    
+      E <- (sample(10:100,1)/100)
+      S <- (1)
+      run <-1
+    
 
   for (t in 1:t_max) {
 
@@ -516,7 +512,7 @@ hyp1  <- function(N, t_max, r_max, energypenalty, mean, sd) {
     
     #####MEETING IN GROUPS######
     
-   population$group <- rep(1:(N/5), times = 5)
+     population$group <- rep(1:(N/5), times = 5)
    
   
   
@@ -527,101 +523,98 @@ hyp1  <- function(N, t_max, r_max, energypenalty, mean, sd) {
       
      groupmeans <- rep(groupmean$meanopenness, times = 5) #again, 5 is group size here
 
-    population$meanopenness <- groupmeans
+     population$meanopenness <- groupmeans
       
-      population$opendirection <- ifelse(population$openness > population$meanopenness, -1, 1)
+     population$opendirection <- ifelse(population$openness > population$meanopenness, -1, 1)
       
      population$openness <- population$openness+((population$openness*(sample(0:100, 1)/1000))*population$opendirection)
 
     
-      ##### 1. 
+  ##### 1. 
+     
      # CHANGING BEHAVIOR AFTER ENVIRONMENT 
+     
       population$free_enrg <- sqrt((E - population$behaviour)^2)
-      
+        
       population$change <- sqrt((population$free_enrg * population$openness)^2)
-      
+        
       population$previous_behaviour <- population$behaviour
 
     ####NEW BEHAVIOR MOVING TOWARD ENVIRONMET
       
-     population$direction <- ifelse(population$previous_behaviour > E, -1, 1)
+      population$direction <- ifelse(population$previous_behaviour > E, -1, 1)
+  
+      population$behaviour <- population$previous_behaviour + population$change*population$direction
+      
+      
+      population$upddiff <- sqrt((E - population$behaviour)^2)/100
+    
 
-    population$behaviour <- population$previous_behaviour + population$change*population$direction
-    
-    
-    population$upddiff <- sqrt((E - population$behaviour)^2)/100
-    
 
- 
-    
      
   # 2.   CALCULATE FITNESS
 
        
-  population$fitness <- 1
+    population$fitness <- 1
   
   #energypentalty relative to outer entropy
   
- P <- energypenalty+(energypenalty*(S/100))
+    P <- energypenalty+(energypenalty*(S/100))
   
-    population$free_enrg <- population$free_enrg/100
+   population$free_enrg <- population$free_enrg/100
    population$change <- population$change/100
   
-    #penalty for prediction error
-  population$fitness <- population$fitness - (population$free_enrg*P)
+  #penalty for prediction error
+   
+   population$fitness <- population$fitness - (population$free_enrg*P)
+  
   #penalty for energy for changing
-  population$fitness <- population$fitness - (population$change*P)
-  #penalty for updated difference
+  
+   population$fitness <- population$fitness - (population$change*P)
+  
+   #penalty for updated difference
+   
    population$fitness <-  population$fitness - (population$upddiff*P)
   
-
-  
     
-   #controlling for negative fitnesses
+  #controlling for negative fitnesses
    
-  population$fitness <-  ifelse(population$fitness<0, 0, population$fitness)
- population$fitness <-  population$fitness+1
-  
-  
-  
+   population$fitness <-  ifelse(population$fitness<0, 0, population$fitness)
+   population$fitness <-  population$fitness+1
   
   
    ##status
-x = 1
-result <- vector(length=length(population$behaviour))
-for (num in population$behaviour) {
-result[x] <- sum(population$behaviour == num)
-x <- x + 1 
-}
+  
+    x = 1
+    result <- vector(length=length(population$behaviour))
+    for (num in population$behaviour) {
+    result[x] <- sum(population$behaviour == num)
+    x <- x + 1 
+    }
+        
+    population$status <- result
     
-population$status <- result
-
-population$status <- population$status/10
+    population$status <- population$status/10
+    
 #Status penalty for mental illness/rigidity/social iso
 
-population$status <- population$status-(1-population$openness)
- population$status <- ifelse(population$status<0, 0, population$status)
-
-
-
-
+    population$status <- population$status-(1-population$openness)
+    population$status <- ifelse(population$status<0, 0, population$status)
 
   
-  
-   # 4. Store population characteristics in output
+ # 4. Store population characteristics in output
       
-      output[output$generation == t & output$run == r, ]$W <-mean(population$fitness)
-      output[output$generation == t & output$run == r, ]$O <- mean(population$openness)
-      output[output$generation == t & output$run == r, ]$M <- E - mean(population$behaviour)
-      output[output$generation == t & output$run == r, ]$B <- mean(population$behaviour)
-      output[output$generation == t & output$run == r, ]$S <- S
-      output[output$generation == t & output$run == r, ]$sd <- sd(population$openness)
-      output[output$generation == t & output$run == r, ]$E <- E
+    output[output$generation == t & output$run == r, ]$W <-mean(population$fitness)
+    output[output$generation == t & output$run == r, ]$O <- mean(population$openness)
+    output[output$generation == t & output$run == r, ]$M <- E - mean(population$behaviour)
+    output[output$generation == t & output$run == r, ]$B <- mean(population$behaviour)
+    output[output$generation == t & output$run == r, ]$S <- S
+    output[output$generation == t & output$run == r, ]$sd <- sd(population$openness)
+    output[output$generation == t & output$run == r, ]$E <- E
  
      
-      
-      
-      # 5. REPRODUCTION
+
+  # 5. REPRODUCTION
       
       previous_population <- population
       
@@ -647,7 +640,8 @@ population$status <- population$status-(1-population$openness)
       
       
 
-      # 6. Potential environmental change
+  # 6. Environmental change
+      
      run <- run+1 
      E <- E + ifelse(run == 30, 10, 1)
      S <- S+(0.5*E)
@@ -675,12 +669,11 @@ quantile(NEO$scaledo)
   #without sudden change
   
     model_open <- simplemodel(N = 1000, t_max = 50, r_max = 50,  energypenalty = 1, mean = 0.58, sd = 0.07)
-    
     model_rigid <- simplemodel(N = 1000, t_max = 50, r_max = 50, energypenalty = 1, mean = 0.17, sd = 0.07)
   
 
   
-#Labels 
+# Labels 
       
   model_rigid$population_type <- "Rigid"
   model_open$population_type <- "Open"
@@ -691,7 +684,7 @@ quantile(NEO$scaledo)
   normal_suddenchange$population_type <- "Normal"
   
   
-##OUTPUTS###
+## OUTPUTS ###
 
     summary(model_rigid$W)
     summary(model_open$W)
@@ -701,24 +694,36 @@ quantile(NEO$scaledo)
     summary(open_suddenchange$W)
     summary(normal_suddenchange$W)
 
-
-
+# combined fatadrames
 
     hyp1big <- rbind(normal_data, model_open, model_rigid)
 
     hyp1bigchange <-  rbind(normal_suddenchange, open_suddenchange, rigid_suddenchange)
     
+    
+##exctinctions stats
+    
     hyp1big %>% group_by(population_type) %>% summarize(sum(W == 0))
-     hyp1bigchange %>% group_by(population_type) %>% summarize(sum(W == 0))
+    hyp1bigchange %>% group_by(population_type) %>% summarize(sum(W == 0))
    
   
+    
+##visual inspection of distribution
+    
+    ggplot(data=hyp1big, aes(x=W)) +
+      geom_density(adjust=1.5, alpha=.3) +
+      theme_bw()+
+      scale_fill_manual( values = c("red", "yellow", "blue"))+
+      labs(x = "Mean population fitness")+
+      ggtitle("Density plots of fitness in no change model")
+        
 #Rescaling fitness values to be between 0 and 1 making sure there are no zeros for beta distribution :)
 
-hyp1big$scaledW <- scales::rescale(hyp1big$W, to=c(0.00001,0.99999))
-
-hyp1bigchange$scaledW <- scales::rescale(hyp1bigchange$W, to=c(0.00001,0.99999))
+  hyp1big$scaledW <- scales::rescale(hyp1big$W, to=c(0.00001,0.99999))
+  
+  hyp1bigchange$scaledW <- scales::rescale(hyp1bigchange$W, to=c(0.00001,0.99999))
     
-##plots
+  ##plots
 
   ggplot(data = hyp1big, aes(y = scaledW, x = O)) +
     geom_point(aes(colour = population_type)) +
@@ -748,19 +753,19 @@ hyp1bigchange$scaledW <- scales::rescale(hyp1bigchange$W, to=c(0.00001,0.99999))
 
 ###VISUAL INSPECTION OF THE GROUPS    
     
-      ggplot(data=hyp1bigchange, aes(x= scaledW, group=population_type, fill=population_type)) +
+     ggplot(data=hyp1bigchange, aes(x= scaledW, group=population_type, fill=population_type)) +
       geom_density(adjust=1.5, alpha=.3) +
       theme_bw()+
       scale_fill_manual( values = c("red", "yellow", "blue"))+
-        geom_vline(xintercept = 0.768304	, size = 0.5, color = "red") + #normal mean
+      geom_vline(xintercept = 0.768304	, size = 0.5, color = "red") + #normal mean
       geom_vline(xintercept = 0.465681	, size = 0.5, color = 'blue')+ #rigid mean
       geom_vline(xintercept = 0.855851	, size = 0.5, color = "yellow") + #open mean
-        labs(x = "Mean population fitness")+
+      labs(x = "Mean population fitness")+
       ggtitle("Density plots of fitness per group in big change model")
 
 
       
-      ggplot(data=hyp1big, aes(x=scaledW, group=population_type, fill=population_type)) +
+     ggplot(data=hyp1big, aes(x=scaledW, group=population_type, fill=population_type)) +
       geom_density(adjust=1.5, alpha=.3) +
       theme_bw()+
       scale_fill_manual( values = c("red", "yellow", "blue"))+
@@ -771,27 +776,27 @@ hyp1bigchange$scaledW <- scales::rescale(hyp1bigchange$W, to=c(0.00001,0.99999))
       ggtitle("Density plots of fitness per group without big change")
       
       ggplot(data=hyp1bigchange, aes(x=scaledW)) +
+        geom_density(adjust=1.5, alpha=.3) +
+        theme_bw()+
+        scale_fill_manual( values = c("red", "yellow", "blue"))+
+        labs(x = "Mean population fitness")+
+        ggtitle("Density plots of fitness in big change model")
+        
+       
+   ##Checking the scaling worked
+       
+    ggplot(data=hyp1big, aes(x=W)) +
       geom_density(adjust=1.5, alpha=.3) +
       theme_bw()+
       scale_fill_manual( values = c("red", "yellow", "blue"))+
       labs(x = "Mean population fitness")+
-      ggtitle("Density plots of fitness in big change model")
-      
-       
-   ##Checking the scaling worked
-       
-       ggplot(data=hyp1big, aes(x=W)) +
-      geom_density(adjust=1.5, alpha=.3) +
-      theme_bw()+
-      scale_fill_manual( values = c("red", "yellow", "blue"))+
-        labs(x = "Mean population fitness")+
       ggtitle("Density plots of fitness in no change model")
        
-         ggplot(data=hyp1big, aes(x=scaledW)) +
+     ggplot(data=hyp1big, aes(x=scaledW)) +
       geom_density(adjust=1.5, alpha=.3) +
       theme_bw()+
       scale_fill_manual( values = c("red", "yellow", "blue"))+
-        labs(x = "Mean population fitness")+
+      labs(x = "Mean population fitness")+
       ggtitle("Density plots of fitness in no change model")
     
 #single run openness stats
@@ -801,60 +806,64 @@ hyp1bigchange$scaledW <- scales::rescale(hyp1bigchange$W, to=c(0.00001,0.99999))
 
 ## SINGLE RUN STATS ##
 
-    mean(hyp1singleR$openness)
     sd(hyp1singleR$openness)
-    median(hyp1singleR$openness)
-    range(hyp1singleR$openness)
+    summary(hyp1singleR$openness)
     
-    mean(hyp1singleO$openness)
+    summary(hyp1singleO$openness)
     sd(hyp1singleO$openness)
-    median(hyp1singleO$openness)
-    range(hyp1singleO$openness)
-    
-    mean(singlerun$openness)
+   
+    summary(singlerun$openness)
     sd(singlerun$openness)
-    median(singlerun$openness)
-    range(singlerun$openness)
+    
+    
+    cor.test(hyp1big$O, hyp1big$W)
+    cor.test(hyp1bigchange$O, hyp1bigchange$W)
+    cor.test(hyp1bigchange$E, hyp1bigchange$W)
+    cor.test(hyp1big$E, hyp1big$W)
 
+    
+#####  MODEL  ######
+    
+    
+  #removing values close to zero just for the sake of the model
+    
+      hyp1bigfiltered <- hyp1big %>% filter(hyp1big$scaledW > 0.01)
 
-cor.test(hyp1big$O, hyp1big$W)
-cor.test(hyp1bigchange$O, hyp1bigchange$W)
-cor.test(hyp1bigchange$E, hyp1bigchange$W)
-cor.test(hyp1big$E, hyp1big$W)
+  #model
+    
+      m1 <- bf(scaledW ~ 1 + population_type + generation + (1 + population_type | run))
 
-
-#model
-m1 <- bf(scaledW ~ 1 + population_type + generation + (1 + population_type | run))
-#priors
-get_prior(m1,
-          hyp1big,
+  #priors
+      get_prior(m1,
+          hyp1bigfiltered,
           family = Beta)
 
-# Defining the priors
-p1 <- c(
-  prior(normal(0, 0.3), class = b),
-  prior(normal(0, 0.5), class = sd),
-  prior(gamma(0.01, 0.01), class = phi)
-)
+  # Defining the priors
+      
+      p1 <- c(
+        prior(normal(0.95, 0.4), class = Intercept),
+        prior(normal(0.015, 0.005), class = b),
+        prior(normal(0.4, 0.2), class = sd),
+        prior(student_t(5, 5, 2.5), class = phi)
+      )
 
-# Building prior model
-m1_prior <- brm(
-  formula = m1,
-  data = hyp1big,
-  family = Beta,
-  prior = p1,
-  sample_prior = TRUE,
-  backend = "cmdstanr",
-)
+  # Building prior model
 
-# PP Check
-(
-pp_check(m1_prior, nsamples = 100) 
-)
+     m1_prior <- brm(
+        formula = m1,
+        data = hyp1bigfiltered,
+        family = Beta,
+        prior = p1,
+        adapt_delta = 0.99,
+        sample_prior = TRUE,
+        backend = "cmdstanr",
+        )
 
-?write.csv()
-write.csv(hyp1big, file ="julia_output.csv")
-quantile(NEO$scaledo)
+  # PP Check
+     
+      (
+      pp_check(m1_prior, nsamples = 1000) 
+      )
 
 
 hypothesis(m1, "population_typeRigid < population_typeOpen")
@@ -871,12 +880,11 @@ hypothesis(m1, "population_typeOpen > population_typeNormal")
 
 
 
-######## HYP 2 #######
+########    HYP 2     #######
 
 
 
 ```{r}
-
 
 set.seed(8675309)
 
@@ -912,87 +920,86 @@ hyp2 <- function(N, t_max, r_max, energypenalty, cS, cE, mean, sd) {
     
     
     # Initialise the environment and entropy
+    
     E <- (sample(10:100,1)/100)
     S <- (1)
   
 
   for (t in 1:t_max) {
 
-     options(dplyr.summarise.inform = FALSE)
+    options(dplyr.summarise.inform = FALSE)
     
     
     #####MEETING IN GROUPS######
     
-   population$group <- rep(1:(N/5), times = 5)
+       population$group <- rep(1:(N/5), times = 5)
    
-  
-  
     ##OPENNESS CHANGE####
+    
+       groupmean <- population %>% group_by(group) %>% summarise(meanopenness = mean(openness)) 
+        
+       groupmeans <- rep(groupmean$meanopenness, times = 5) #again, 5 is group size here
   
-    
-     groupmean <- population %>% group_by(group) %>% summarise(meanopenness = mean(openness)) 
-      
-     groupmeans <- rep(groupmean$meanopenness, times = 5) #again, 5 is group size here
-
-    population$meanopenness <- groupmeans
-      
-      population$opendirection <- ifelse(population$openness > population$meanopenness, -1, 1)
-      
-     population$openness <- population$openness+((population$openness*(sample(0:100, 1)/1000))*population$opendirection)
+       population$meanopenness <- groupmeans
+        
+       population$opendirection <- ifelse(population$openness > population$meanopenness, -1, 1)
+        
+       population$openness <- population$openness+((population$openness*(sample(0:100, 1)/1000))*population$opendirection)
 
     
-      ##### 1. 
+  ##### 1.
+     
      # CHANGING BEHAVIOR AFTER ENVIRONMENT 
-      population$free_enrg <- sqrt((E - population$behaviour)^2)
-      
-      population$change <- sqrt((population$free_enrg * population$openness)^2)
-      
-      population$previous_behaviour <- population$behaviour
+     
+       population$free_enrg <- sqrt((E - population$behaviour)^2)
+        
+       population$change <- sqrt((population$free_enrg * population$openness)^2)
+        
+       population$previous_behaviour <- population$behaviour
 
     ####NEW BEHAVIOR MOVING TOWARD ENVIRONMET
       
-    population$direction <- ifelse(population$previous_behaviour > E, -1, 1)
-
-    population$behaviour <- population$previous_behaviour + population$change*population$direction
-    
-    
-    population$upddiff <- sqrt((E - population$behaviour)^2)/100
+      population$direction <- ifelse(population$previous_behaviour > E, -1, 1)
+  
+      population$behaviour <- population$previous_behaviour + population$change*population$direction
+      
+      
+      population$upddiff <- sqrt((E - population$behaviour)^2)/100
     
 
  
-    
-     
   # 2.   CALCULATE FITNESS
 
-        population$fitness <- 1
+    population$fitness <- 1
   
-     #energypentalty relative to outer entropy
+    #energypentalty relative to outer entropy
   
-     P <- energypenalty+(energypenalty*(S/10))
+      P <- energypenalty+(energypenalty*(S/10))
       
-    population$free_enrg <- population$free_enrg/100
-    population$change <- population$change/100
+      population$free_enrg <- population$free_enrg/100
+      population$change <- population$change/100
   
     #penalty for prediction error
-    population$fitness <- population$fitness - (population$free_enrg*P)
+      
+      population$fitness <- population$fitness - (population$free_enrg*P)
+    
     #penalty for energy for changing
-    population$fitness <- population$fitness - (population$change*P)
-    #penalty for updated difference
-    population$fitness <-  population$fitness - (population$upddiff*P)
-    
-
-  
-    
-   #controlling for negative fitnesses
+      
+      population$fitness <- population$fitness - (population$change*P)
    
-     population$fitness <-  ifelse(population$fitness<0, 0, population$fitness)
-  
-     population$fitness <- population$fitness + 1
-  
-  
-  
+    #penalty for updated difference
+      
+      population$fitness <-  population$fitness - (population$upddiff*P)
+    
+    
+     #controlling for negative fitnesses
+   
+      population$fitness <-  ifelse(population$fitness<0, 0, population$fitness)
+    
+      population$fitness <- population$fitness + 1
   
    ##status
+     
       x = 1
       result <- vector(length=length(population$behaviour))
       for (num in population$behaviour) {
@@ -1003,17 +1010,13 @@ hyp2 <- function(N, t_max, r_max, energypenalty, cS, cE, mean, sd) {
       population$status <- result
       
       population$status <- population$status/10
+      
   #Status penalty for mental illness/rigidity/social iso
 
-   population$status <-population$status-(1-population$openness)
-   population$status <-  ifelse(population$status<0, 0, population$status)
+       population$status <-population$status-(1-population$openness)
+       population$status <-  ifelse(population$status<0, 0, population$status)
 
 
-
-
-
-  
-   Openness <- population$openness
    # 4. Store population characteristics in output
       
       output[output$generation == t & output$run == r, ]$W <-mean(population$fitness)
@@ -1021,43 +1024,41 @@ hyp2 <- function(N, t_max, r_max, energypenalty, cS, cE, mean, sd) {
       output[output$generation == t & output$run == r, ]$M <- E - mean(population$behaviour)
       output[output$generation == t & output$run == r, ]$B <- mean(population$behaviour)
       output[output$generation == t & output$run == r, ]$E <- E
-     output[output$generation == t & output$run == r, ]$sd <- sd(population$openness)
+      output[output$generation == t & output$run == r, ]$sd <- sd(population$openness)
       output[output$generation == t & output$run == r, ]$S <- S
      
       
       
-      # 5. REPRODUCTION
+   # 5. REPRODUCTION
       
-      previous_population <- population
+        previous_population <- population
       
     
       #copy behaviour based on fitness and status <3 yay
       
-      population$openness <- 
-      sample(previous_population$openness, size = N, replace = TRUE, prob = previous_population$fitness)
+        population$openness <- 
+        sample(previous_population$openness, size = N, replace = TRUE, prob = previous_population$fitness)
       
   
 
       #behaviour replication
       
-      previous_population$copyprob <- previous_population$fitness+previous_population$status
-
-      population$behaviour <- 
-      sample(previous_population$behaviour, size = N, replace = T, prob = previous_population$copyprob)
-
-      
+        previous_population$copyprob <- previous_population$fitness+previous_population$status
+  
+        population$behaviour <- 
+        sample(previous_population$behaviour, size = N, replace = T, prob = previous_population$copyprob)
      
-      groupmean <- NA
-      groupmeans <- NA
+        groupmean <- NA
+        groupmeans <- NA
       
       
 
-      # 6. Potential environmental change
-     E <- E + cE
-     S <- S+(cS*E)
+    # 6. Environmental change
+      
+       E <- E + cE
+       S <- S+(cS*E)
      
    
-      
   }
   
   }
@@ -1068,46 +1069,43 @@ hyp2 <- function(N, t_max, r_max, energypenalty, cS, cE, mean, sd) {
 
 #model definition
 
-entr_inc1 <- hyp2(N = 1000, t_max = 50, r_max = 50, energypenalty = 1, cS = 1, cE = 1, mean = 0.37, sd = 0.07)
-entr_inc2 <- hyp2(N = 1000, t_max = 50, r_max = 50, energypenalty = 1, cS = 0.5, cE = 2, mean = 0.37, sd = 0.07)
-
-entr_inc1$population_type <- "Entropy"
-entr_inc2$population_type <-  "Environment"
+  entr_inc1 <- hyp2(N = 1000, t_max = 50, r_max = 50, energypenalty = 1, cS = 1, cE = 1, mean = 0.37, sd = 0.07)
+  entr_inc2 <- hyp2(N = 1000, t_max = 50, r_max = 50, energypenalty = 1, cS = 0.5, cE = 2, mean = 0.37, sd = 0.07)
+  
+  entr_inc1$population_type <- "Entropy"
+  entr_inc2$population_type <-  "Environment"
 
 
 #merge data for plotting
 
-change <- rbind(entr_inc1, entr_inc2, normal_data)
+  change <- rbind(entr_inc1, entr_inc2, normal_data)
 
 
 #plots
   
 
-ggplot(change, aes(y = O, x = generation, color = population_type)) + 
-    geom_line( alpha=.4)+
-    theme_bw() +
-  stat_summary(fun = mean, geom = "line")+
-    scale_color_manual(values = wes_palette("Cavalcanti1"))+
-    labs(x = "Generation", y = "Mean population openness")+
-    ggtitle("Mean population openness by global changes")
+  ggplot(change, aes(y = O, x = generation, color = population_type)) + 
+      geom_line( alpha=.4)+
+      theme_bw() +
+      stat_summary(fun = mean, geom = "line")+
+      scale_color_manual(values = wes_palette("Cavalcanti1"))+
+      labs(x = "Generation", y = "Mean population openness")+
+      ggtitle("Mean population openness by global changes")
 
  
 #some quick cor tests 
 
-cor.test(entr_inc1$O, entr_inc1$S)
-cor.test(entr_inc2$O, entr_inc2$S)
-cor.test(entr_inc1$O, entr_inc1$E)
-cor.test(entr_inc2$O, entr_inc2$E)
-
-
-
-
+      cor.test(entr_inc1$O, entr_inc1$S)
+      cor.test(entr_inc2$O, entr_inc2$S)
+      cor.test(entr_inc1$O, entr_inc1$E)
+      cor.test(entr_inc2$O, entr_inc2$E)
 
 #### MODEL #####
 
   m2 <-  lmerTest::lmer(O ~ 0 + S*generation + (1 | run), data = normal_data)
-    summary(m3)
-    AIC(m3)
+    
+         summary(m2)
+
     
     
 ```
@@ -1141,23 +1139,21 @@ single_run_change <- function(N, t_max, energypenalty, mean, sd, cE, cS) {
     
     
     # Initialise the environment and entropy
-    E <- (sample(10:100,1)/100)
-    S <- (1)
+    
+      E <- (sample(10:100,1)/100)
+      S <- (1)
   
 
   for (t in 1:t_max) {
  
 
-     options(dplyr.summarise.inform = FALSE)
+      options(dplyr.summarise.inform = FALSE)
     
-    
- 
     
     #####MEETING IN GROUPS######
     
-   population$group <- rep(1:(N/5), times = 5)
+       population$group <- rep(1:(N/5), times = 5)
    
-  
   
     ##OPENNESS CHANGE####
   
@@ -1166,77 +1162,84 @@ single_run_change <- function(N, t_max, energypenalty, mean, sd, cE, cS) {
       
      groupmeans <- rep(groupmean$meanopenness, times = 5) #again, 5 is group size here
 
-    population$meanopenness <- groupmeans
+     population$meanopenness <- groupmeans
       
-      population$opendirection <- ifelse(population$openness > population$meanopenness, -1, 1)
+     population$opendirection <- ifelse(population$openness > population$meanopenness, -1, 1)
       
      population$openness <- population$openness+((population$openness*(sample(0:100, 1)/1000))*population$opendirection)
 
     
-      ##### 1. 
+ ##### 1. 
+     
      # CHANGING BEHAVIOR AFTER ENVIRONMENT 
-      population$free_enrg <- sqrt((E - population$behaviour)^2)
-      
-      population$change <- sqrt((population$free_enrg * population$openness)^2)
-      
-      population$previous_behaviour <- population$behaviour
+     
+        population$free_enrg <- sqrt((E - population$behaviour)^2)
+        
+        population$change <- sqrt((population$free_enrg * population$openness)^2)
+        
+        population$previous_behaviour <- population$behaviour
 
     ####NEW BEHAVIOR MOVING TOWARD ENVIRONMET
       
-     population$direction <- ifelse(population$previous_behaviour > E, -1, 1)
-
-    population$behaviour <- population$previous_behaviour + population$change*population$direction
+        population$direction <- ifelse(population$previous_behaviour > E, -1, 1)
     
-    
-    population$upddiff <- sqrt((E - population$behaviour)^2)/100
-    
-
+        population$behaviour <- population$previous_behaviour + population$change*population$direction
+        
+        
+        population$upddiff <- sqrt((E - population$behaviour)^2)/100
+      
  
-    
      
-  # 2.   CALCULATE FITNESS
+  ## 2.   CALCULATE FITNESS
 
        
-  population$fitness <- 1
+       population$fitness <- 1
   
   #energypentalty relative to outer entropy
   
- P <- energypenalty+(energypenalty*(S/100))
+       P <- energypenalty+(energypenalty*(S/100))
   
-    population$free_enrg <- population$free_enrg/100
-   population$change <- population$change/100
-  
+       population$free_enrg <- population$free_enrg/100
+       population$change <- population$change/100
+    
     #penalty for prediction error
-  population$fitness <- population$fitness - (population$free_enrg*P)
-  #penalty for energy for changing
-  population$fitness <- population$fitness - (population$change*P)
-  #penalty for updated difference
-   population$fitness <-  population$fitness - (population$upddiff*P)
+       
+      population$fitness <- population$fitness - (population$free_enrg*P)
+    
+    #penalty for energy for changing
+      
+      population$fitness <- population$fitness - (population$change*P)
+   
+    #penalty for updated difference
+    
+      population$fitness <-  population$fitness - (population$upddiff*P)
   
 
   
     
    #controlling for negative fitnesses
    
-  population$fitness <-  ifelse(population$fitness<0, 0, population$fitness)
-
-  population$fitness <-  population$fitness+1
-  
-  
+      population$fitness <-  ifelse(population$fitness<0, 0, population$fitness)
+    
+      population$fitness <-  population$fitness+1
+      
+      
   
   
    ##status
-x = 1
-result <- vector(length=length(population$behaviour))
-for (num in population$behaviour) {
-result[x] <- sum(population$behaviour == num)
-x <- x + 1 
-}
+      
+      x = 1
+      result <- vector(length=length(population$behaviour))
+      for (num in population$behaviour) {
+      result[x] <- sum(population$behaviour == num)
+      x <- x + 1 
+      }
     
-population$status <- result
-
-population$status <- population$status/10
-#Status penalty for mental illness/rigidity/social iso
+      population$status <- result
+      
+      population$status <- population$status/10
+      
+  #Status penalty for mental illness/rigidity/social iso
 
 population$status <-population$status-(1-population$openness)
 population$status <-  ifelse(population$status<0, 0, population$status)
@@ -1256,7 +1259,7 @@ population$status <-  ifelse(population$status<0, 0, population$status)
   
       
       
-      # 5. REPRODUCTION
+   # 5. REPRODUCTION
       
       previous_population <- population
       
@@ -1282,7 +1285,8 @@ population$status <-  ifelse(population$status<0, 0, population$status)
       
       
 
-      # 6. Potential environmental change
+   # 6. Environmental change
+      
      E <- E + cE
      S <- S+(cS*E)
      
@@ -1298,59 +1302,69 @@ population$status <-  ifelse(population$status<0, 0, population$status)
 
     singleentropy <- single_run_change(N = 1000, t_max = 50, energypenalty = 1,  mean = 0.37, sd = 0.07, cE = 1, cS = 1)
     singleenvironment <- single_run_change(N = 1000, t_max = 50, energypenalty = 1,  mean = 0.37, sd = 0.07, cE = 2, cS = 0.5)
-      singlenormal <- single_run_change(N = 1000, t_max = 50, energypenalty = 1,  mean = 0.37, sd = 0.07, cE = 1, cS = 0.5)
+    singlenormal <- single_run_change(N = 1000, t_max = 50, energypenalty = 1,  mean = 0.37, sd = 0.07, cE = 1, cS = 0.5)
+    
+    # Labels
 
     singleentropy$change <- "Increased entropy"
     singleenvironment$change <- "Increased environment"
     singlenormal$change <- "Normal rate of change"
     
-  singlecomb <- rbind(singleentropy, singleenvironment, singlenormal)
+    #combined dataframe
+    
+    singlecomb <- rbind(singleentropy, singleenvironment, singlenormal)
   
- ggdensity(singleentropy$openness, 
+    ggdensity(singleentropy$openness, 
               main = "Density plot of openness in increased entropy change",
               xlab = "Openness score")
- ggdensity(singleenvironment$openness, 
+    ggdensity(singleenvironment$openness, 
               main = "Density plot of openness in increased environment change",
               xlab = "Openness score")
 
   #filtering for rigid individuals
  
-  onegenentropy <- single_runmodel(N = 1000, t_max = 50, energypenalty = 1,  mean = 0.37, sd = 0.07, cE = 1, cS = 1)
+    onegenentropy <- single_runmodel(N = 1000, t_max = 50, energypenalty = 1,  mean = 0.37, sd = 0.07, cE = 1, cS = 1)
     onegenenvironment <- single_runmodel(N = 1000, t_max = 50, energypenalty = 1,  mean = 0.37, sd = 0.07, cE = 2, cS = 0.5)
-      onegennormal <- single_runmodel(N = 1000, t_max = 50, energypenalty = 1,  mean = 0.37, sd = 0.07, cE = 1, cS = 0.5)
+    onegennormal <- single_runmodel(N = 1000, t_max = 50, energypenalty = 1,  mean = 0.37, sd = 0.07, cE = 1, cS = 0.5)
 
-    onegenentropy$change <- "Increased entropy"
-   onegenenvironment$change <- "Increased environment"
-    onegennormal$change <- "Normal rate of change"
+  #Labels 
     
+  onegenentropy$change <- "Increased entropy"
+  onegenenvironment$change <- "Increased environment"
+  onegennormal$change <- "Normal rate of change"
+    
+  #combined data
+  
   onegencomb <- rbind(onegenentropy, onegenenvironment, onegennormal)
    
      
+  #filtering for rigid population
+  
      rigident <- singleentropy %>% filter(singleentropy$openness < 0.37)
      rigidenv <- singleenvironment %>% filter(singleenvironment$openness < 0.37)
      rigidnorm <- singlenormal %>% filter(singlenormal$openness < 0.37)
 
      rigidcombined <- rbind(rigident, rigidenv, rigidnorm)
      
-     ##one total genration filtered by rigid agents
+  ##one total genration filtered by rigid agents
    
      onegenrigidenv <- onegenentropy %>% filter(onegenentropy$openness < 0.37)
      onegenrigident <- onegenenvironment %>% filter(onegenenvironment$openness < 0.37)
      onegenrigidnorm <- onegennormal %>% filter(onegennormal$openness < 0.37)
      
-    onegenrigidcombined <- rbind(onegenrigident, onegenrigidenv, onegenrigidnorm)
+     onegenrigidcombined <- rbind(onegenrigident, onegenrigidenv, onegenrigidnorm)
      
      
    #plotting the rigid
    
-  ggplot(data=onegenrigidcombined, aes(x=openness, group=change, fill=change)) +
-      geom_density(adjust=1.5, alpha=.4) +
-      theme_bw()+
-      scale_fill_manual(values = wes_palette("Cavalcanti1"))+
-       labs(y = "Density", x = "Openness")+
-      ggtitle("Density plots of rigid individuals in the last generation across three conditions")
+      ggplot(data=onegenrigidcombined, aes(x=openness, group=change, fill=change)) +
+          geom_density(adjust=1.5, alpha=.4) +
+          theme_bw()+
+          scale_fill_manual(values = wes_palette("Cavalcanti1"))+
+           labs(y = "Density", x = "Openness")+
+          ggtitle("Density plots of rigid individuals in the last generation across three conditions")
 
-#single run stats for rigid agents
+  #single run stats for rigid agents
 
     mean(rigidenv$openness)
     mean(rigident$openness)
@@ -1362,7 +1376,7 @@ population$status <-  ifelse(population$status<0, 0, population$status)
     sd(rigident$openness)
     
     t.test(rigident$openness, rigidenv$openness)
-     t.test(onegenrigident$openness, onegenrigidenv$openness)
+    t.test(onegenrigident$openness, onegenrigidenv$openness)
        
 #statistics   
    
@@ -1379,8 +1393,8 @@ population$status <-  ifelse(population$status<0, 0, population$status)
       geom_line() +
       theme_bw()+
       scale_fill_manual(values = wes_palette("GrandBudapest1"))+
-       geom_smooth(method = "lm") +
-       labs(y = "Mean openness per generation", x = "Generation")+
+      geom_smooth(method = "lm") +
+      labs(y = "Mean openness per generation", x = "Generation")+
       ggtitle("Openness over time according to external change (single run)")
      
          
@@ -1388,8 +1402,8 @@ population$status <-  ifelse(population$status<0, 0, population$status)
       geom_line() +
       theme_bw()+
       scale_fill_manual(values = wes_palette("GrandBudapest1"))+
-       geom_smooth(method = "lm") +
-       labs(y = "Mean openness per generation", x = "Generation")+
+      geom_smooth(method = "lm") +
+      labs(y = "Mean openness per generation", x = "Generation")+
       ggtitle("Openness over time according to external change (single run)")
 
 
@@ -1451,8 +1465,9 @@ hyp3 <- function(N, t_max, r_max, energypenalty, mean, sd) {
     
     
     # Initialise the environment and entropy
-    E <- (sample(10:100,1)/100)
-    S <- (1)
+    
+      E <- (sample(10:100,1)/100)
+      S <- (1)
   
 
   for (t in 1:t_max) {
@@ -1467,17 +1482,14 @@ hyp3 <- function(N, t_max, r_max, energypenalty, mean, sd) {
     
     ifelse(g < 10, population[1:g2,4] <- 1, population$openness)
     
- 
     
-    
-    
-     #####MEETING IN GROUPS######
+   #####MEETING IN GROUPS######
     
      population$group <- rep(1:(N/5), times = 5)
    
   
   
-     ##OPENNESS CHANGE####
+   ##OPENNESS CHANGE####
   
     
      groupmean <- population %>% group_by(group) %>% summarise(meanopenness = mean(openness)) 
@@ -1491,16 +1503,17 @@ hyp3 <- function(N, t_max, r_max, energypenalty, mean, sd) {
      population$openness <- population$openness+((population$openness*(sample(0:100, 1)/1000))*population$opendirection)
 
     
-     ##### 1. 
+  ##### 1. 
      
     # CHANGING BEHAVIOR AFTER ENVIRONMENT 
-      population$free_enrg <- sqrt((E - population$behaviour)^2)
+      
+     population$free_enrg <- sqrt((E - population$behaviour)^2)
       
       population$change <- sqrt((population$free_enrg * population$openness)^2)
       
       population$previous_behaviour <- population$behaviour
 
-  ####NEW BEHAVIOR MOVING TOWARD ENVIRONMET
+    ####NEW BEHAVIOR MOVING TOWARD ENVIRONMET
       
       population$direction <- ifelse(population$previous_behaviour > E, -1, 1)
   
@@ -1508,9 +1521,6 @@ hyp3 <- function(N, t_max, r_max, energypenalty, mean, sd) {
       
       
       population$upddiff <- sqrt((E - population$behaviour)^2)/100
-      
-
- 
     
      
   # 2. CALCULATE FITNESS
@@ -1526,20 +1536,23 @@ hyp3 <- function(N, t_max, r_max, energypenalty, mean, sd) {
     population$change <- population$change/100
     
     #penalty for prediction error
-    population$fitness <- population$fitness - (population$free_enrg*P)
+    
+      population$fitness <- population$fitness - (population$free_enrg*P)
+    
     #penalty for energy for changing
-    population$fitness <- population$fitness - (population$change*P)
+    
+      population$fitness <- population$fitness - (population$change*P)
+    
     #penalty for updated difference
-    population$fitness <-  population$fitness - (population$upddiff*P)
+    
+      population$fitness <-  population$fitness - (population$upddiff*P)
   
 
-  
-    
-  #controlling for negative fitnesses
+    #controlling for negative fitnesses
    
-    population$fitness <-  ifelse(population$fitness<0, 0, population$fitness)
-  
-    population$fitness <- population$fitness + 1
+      population$fitness <-  ifelse(population$fitness<0, 0, population$fitness)
+    
+      population$fitness <- population$fitness + 1
   
   
   
@@ -1547,75 +1560,66 @@ hyp3 <- function(N, t_max, r_max, energypenalty, mean, sd) {
   
     ##status
     
-     x = 1
-     result <- vector(length=length(population$behaviour))
-      for (num in population$behaviour) {
-        result[x] <- sum(population$behaviour == num)
-        x <- x + 1 
-        }
+       x = 1
+       result <- vector(length=length(population$behaviour))
+        for (num in population$behaviour) {
+          result[x] <- sum(population$behaviour == num)
+          x <- x + 1 
+          }
           
-      population$status <- result
-      population$status <-  ifelse(population$openness ==1, 100, population$status)
-           
+        population$status <- result
+        population$status <-  ifelse(population$openness ==1, 100, population$status)
+             
       
-      population$status <- population$status/10
+        population$status <- population$status/10
       
       #Status penalty for mental illness/rigidity/social iso
       
-      population$status <-population$status-(1-population$openness)
-      population$status <-  ifelse(population$status<0, 0, population$status)
-
-
-
-
+        population$status <-population$status-(1-population$openness)
+        population$status <-  ifelse(population$status<0, 0, population$status)
 
   
   
       # 4. Store population characteristics in output
       
-      output[output$generation == t & output$run == r, ]$W <-mean(population$fitness)
-      output[output$generation == t & output$run == r, ]$O <- mean(population$openness)
-      output[output$generation == t & output$run == r, ]$M <- E - mean(population$behaviour)
-      output[output$generation == t & output$run == r, ]$B <- mean(population$behaviour)
-      output[output$generation == t & output$run == r, ]$S <- S
-      output[output$generation == t & output$run == r, ]$sd <- sd(population$openness)
-             output[output$generation == t & output$run == r, ]$E <- E
+        output[output$generation == t & output$run == r, ]$W <-mean(population$fitness)
+        output[output$generation == t & output$run == r, ]$O <- mean(population$openness)
+        output[output$generation == t & output$run == r, ]$M <- E - mean(population$behaviour)
+        output[output$generation == t & output$run == r, ]$B <- mean(population$behaviour)
+        output[output$generation == t & output$run == r, ]$S <- S
+        output[output$generation == t & output$run == r, ]$sd <- sd(population$openness)
+               output[output$generation == t & output$run == r, ]$E <- E
 
  
      
-      
-      
       # 5. REPRODUCTION
       
-      previous_population <- population
+        previous_population <- population
       
     
       #copy behaviour based on fitness and status 
       
-      population$openness <- 
-      sample(previous_population$openness, size = N, replace = TRUE, prob = previous_population$fitness)
-      
-  
+        population$openness <- 
+        sample(previous_population$openness, size = N, replace = TRUE, prob = previous_population$fitness)
 
       #behaviour replication
       
-      previous_population$copyprob <- previous_population$fitness+previous_population$status
+        previous_population$copyprob <- previous_population$fitness+previous_population$status
 
-      population$behaviour <- 
-      sample(previous_population$behaviour, size = N, replace = T, prob = previous_population$copyprob)
-
-      
+        population$behaviour <- 
+        sample(previous_population$behaviour, size = N, replace = T, prob = previous_population$copyprob)
+  
+        
      
-      groupmean <- NA
-      groupmeans <- NA
-      
+        groupmean <- NA
+        groupmeans <- NA
       
 
-     # 6. Potential environmental change
+     # 6. Environmental change
       
-     E <- E +  1
-     S <- S+(0.5*E)
-     
+       E <- E +  1
+       S <- S+(0.5*E)
+       
       
   }
   
@@ -1628,41 +1632,41 @@ hyp3 <- function(N, t_max, r_max, energypenalty, mean, sd) {
 
 model_gurus <- hyp3(N = 1000, t_max = 50, r_max = 50, energypenalty = 1, mean = 0.37, sd = 0.07)
 
+#Labels
 
-
-model_gurus$population_type <- "Gurus"
-normal_data$population_type <- "No gurus"
-
-hyp3big <- rbind(model_gurus,normal_data)
+  model_gurus$population_type <- "Gurus"
+  normal_data$population_type <- "No gurus"
+  
+  hyp3big <- rbind(model_gurus,normal_data)
 
 #scaling 
 
-hyp3big$W <- hyp3big$W-1
+  hyp3big$W <- hyp3big$W-1
 
 #visualizations
 
-plot_boxopen <- function(data_model) {
-  ggplot(data = data_model, aes(y = O, x = population_type)) +
-    geom_boxplot(aes(color = population_type)) +
-     scale_color_manual(values = wes_palette("Cavalcanti1"))+
-    theme_bw() +
-    labs(y = "Mean population openness", x = "Population type")+
-    ggtitle("Mean group openness per population type")
-}
+  plot_boxopen <- function(data_model) {
+    ggplot(data = data_model, aes(y = O, x = population_type)) +
+      geom_boxplot(aes(color = population_type)) +
+       scale_color_manual(values = wes_palette("Cavalcanti1"))+
+      theme_bw() +
+      labs(y = "Mean population openness", x = "Population type")+
+      ggtitle("Mean group openness per population type")
+  }
 
 
-plot_boxfitness <- function(data_model) {
-  ggplot(data = data_model, aes(y = W, x = population_type)) +
-    geom_boxplot(aes( color = population_type)) +
-     scale_color_manual(values = wes_palette("Cavalcanti1"))+
-    theme_bw() +
-    labs(y = "Population mean fitness", x = "Population type")+
-    ggtitle("Mean group fitness per population type")
-}
+  plot_boxfitness <- function(data_model) {
+    ggplot(data = data_model, aes(y = W, x = population_type)) +
+      geom_boxplot(aes( color = population_type)) +
+       scale_color_manual(values = wes_palette("Cavalcanti1"))+
+      theme_bw() +
+      labs(y = "Population mean fitness", x = "Population type")+
+      ggtitle("Mean group fitness per population type")
+  }
 
-  plot_boxopen(hyp3big)
-  plot_boxfitness(hyp3big)
-
+    plot_boxopen(hyp3big)
+    plot_boxfitness(hyp3big)
+  
 
 
 
@@ -1670,27 +1674,27 @@ plot_boxfitness <- function(data_model) {
  
     t.test(normal_data$W, model_gurus$W)
     
-summary(model_gurus$W)
-summary(model_gurus$O)
-sd(model_gurus$O)
-sd(model_gurus$W)
-    
-summary(normal_data$W)
-summary(normal_data$O)
-sd(normal_data$W)
-sd(normal_data$O)
+    summary(model_gurus$W)
+    summary(model_gurus$O)
+    sd(model_gurus$O)
+    sd(model_gurus$W)
+        
+    summary(normal_data$W)
+    summary(normal_data$O)
+    sd(normal_data$W)
+    sd(normal_data$O)
 
 
       
 ###### SINGLE-RUN GURU CODE ####
 
 
-#SINGLE RUN
+  #SINGLE RUN
 
-single_runmodel_gurus <- function(N, t_max, energypenalty, mean, sd) {
+    single_runmodel_gurus <- function(N, t_max, energypenalty, mean, sd) {
 
 
-  lastpop <- tibble(p = as.numeric(1:N, N),
+    lastpop <- tibble(p = as.numeric(1:N, N),
                   openness = as.numeric(rep(NA, N)))
   
 
@@ -1725,136 +1729,132 @@ single_runmodel_gurus <- function(N, t_max, energypenalty, mean, sd) {
     
     #####MEETING IN GROUPS######
     
-   population$group <- rep(1:(N/5), times = 5)
+      population$group <- rep(1:(N/5), times = 5)
    
-  
   
     ##OPENNESS CHANGE####
   
-    
      groupmean <- population %>% group_by(group) %>% summarise(meanopenness = mean(openness)) 
       
      groupmeans <- rep(groupmean$meanopenness, times = 5) #again, 5 is group size here
 
-    population$meanopenness <- groupmeans
+     population$meanopenness <- groupmeans
       
-      population$opendirection <- ifelse(population$openness > population$meanopenness, -1, 1)
+     population$opendirection <- ifelse(population$openness > population$meanopenness, -1, 1)
       
      population$openness <- population$openness+((population$openness*(sample(0:100, 1)/1000))*population$opendirection)
 
     
-      ##### 1. 
+    ##### 1. 
+     
+    
      # CHANGING BEHAVIOR AFTER ENVIRONMENT 
-      population$free_enrg <- sqrt((E - population$behaviour)^2)
-      
-      population$change <- sqrt((population$free_enrg * population$openness)^2)
-      
-      population$previous_behaviour <- population$behaviour
+     
+        population$free_enrg <- sqrt((E - population$behaviour)^2)
+        
+        population$change <- sqrt((population$free_enrg * population$openness)^2)
+        
+        population$previous_behaviour <- population$behaviour
 
-    ####NEW BEHAVIOR MOVING TOWARD ENVIRONMET
+     ####NEW BEHAVIOR MOVING TOWARD ENVIRONMET
       
-     population$direction <- ifelse(population$previous_behaviour > E, -1, 1)
-
-    population$behaviour <- population$previous_behaviour + population$change*population$direction
+        population$direction <- ifelse(population$previous_behaviour > E, -1, 1)
+    
+        population$behaviour <- population$previous_behaviour + population$change*population$direction
     
     
-    population$upddiff <- sqrt((E - population$behaviour)^2)/100
-    
-
- 
+        population$upddiff <- sqrt((E - population$behaviour)^2)/100
     
      
   # 2.   CALCULATE FITNESS
 
-       
-  population$fitness <- 1
+        population$fitness <- 1
   
   #energypentalty relative to outer entropy
   
- P <- energypenalty+(energypenalty*(S/100))
+    P <- energypenalty+(energypenalty*(S/100))
   
     population$free_enrg <- population$free_enrg/100
-   population$change <- population$change/100
+    population$change <- population$change/100
   
-    #penalty for prediction error
-  population$fitness <- population$fitness - (population$free_enrg*P)
+    
+  #penalty for prediction error
+    
+    population$fitness <- population$fitness - (population$free_enrg*P)
+  
   #penalty for energy for changing
-  population$fitness <- population$fitness - (population$change*P)
+  
+    population$fitness <- population$fitness - (population$change*P)
+  
   #penalty for updated difference
-   population$fitness <-  population$fitness - (population$upddiff*P)
+  
+    population$fitness <-  population$fitness - (population$upddiff*P)
   
 
   
     
-   #controlling for negative fitnesses
+  #controlling for negative fitnesses
    
-  population$fitness <-  ifelse(population$fitness<0, 0, population$fitness)
-
-  population$fitness <-  population$fitness+1
+    population$fitness <-  ifelse(population$fitness<0, 0, population$fitness)
   
-  
+    population$fitness <-  population$fitness+1
+    
+    
   
   
    ##status
-x = 1
-result <- vector(length=length(population$behaviour))
-for (num in population$behaviour) {
-result[x] <- sum(population$behaviour == num)
-x <- x + 1 
-}
     
-population$status <- result
+    x = 1
+    result <- vector(length=length(population$behaviour))
+    for (num in population$behaviour) {
+    result[x] <- sum(population$behaviour == num)
+    x <- x + 1 
+    }
+    
+    population$status <- result
+    
+    population$status <- population$status/10
+    
+  #Status penalty for mental illness/rigidity/social iso
 
-population$status <- population$status/10
-#Status penalty for mental illness/rigidity/social iso
-
-population$status <-population$status-(1-population$openness)
-population$status <-  ifelse(population$status<0, 0, population$status)
+    population$status <-population$status-(1-population$openness)
+    population$status <-  ifelse(population$status<0, 0, population$status)
 
 
-
-
-
-  
-  
-   # 4. Store population characteristics in output
+ # 4. Store population characteristics in output
 
        lastpop$openness <- population$openness
          
-        
- 
-  
       
-      
-      # 5. REPRODUCTION
+ # 5. REPRODUCTION
       
       previous_population <- population
       
-    
       #copy behaviour based on fitness and status <3 yay
       
-      population$openness <- 
-      sample(previous_population$openness, size = N, replace = TRUE, prob = previous_population$fitness)
-      
+          population$openness <- 
+          sample(previous_population$openness, size = N, replace = TRUE, prob = previous_population$fitness)
+          
   
 
       #behaviour replication
       
-      previous_population$copyprob <- previous_population$fitness+previous_population$status
-
-      population$behaviour <- 
-      sample(previous_population$behaviour, size = N, replace = T, prob = previous_population$copyprob)
+          previous_population$copyprob <- previous_population$fitness+previous_population$status
+    
+          population$behaviour <- 
+          sample(previous_population$behaviour, size = N, replace = T, prob = previous_population$copyprob)
 
       
      
-      groupmean <- NA
-      groupmeans <- NA
+          groupmean <- NA
+          groupmeans <- NA
       
       
 
-      # 6. Potential environmental change
-     E <- E + 1
-     S <- S+(0.5*E)
+      # 6. Environmental change
+          
+         E <- E + 1
+         S <- S+(0.5*E)
      
    
       
@@ -1867,10 +1867,10 @@ population$status <-  ifelse(population$status<0, 0, population$status)
 
       singlerunguru <- single_runmodel_gurus(N = 1000, t_max = 50, energypenalty = 1,  mean = 0.37, sd = 0.07)
       
-      #hypothesis testing
+   #hypothesis testing
      
-      t.test(NEO$scaledo,      singlerunguru$openness)
-      t.test(NEO$scaledo,      singlerun$openness)
+      t.test(NEO$scaledo, singlerunguru$openness)
+      t.test(NEO$scaledo, singlerun$openness)
      
       sd(NEO$scaledo)
       sd(singlerunguru$openness)
@@ -1908,7 +1908,8 @@ hyp3nosocial <- function(N, t_max, r_max, energypenalty, mean, sd) {
   for (r in 1:r_max) {
     
     # Create a population. replace = t means they can have same openness
-    population <- tibble(behaviour = ((sample(10:100, N, replace = TRUE))/100),
+   
+       population <- tibble(behaviour = ((sample(10:100, N, replace = TRUE))/100),
                          free_enrg = rep(NA, N),
                          change = rep(NA,N),
                          openness = (rnorm(1000, mean, sd)),
@@ -1920,23 +1921,24 @@ hyp3nosocial <- function(N, t_max, r_max, energypenalty, mean, sd) {
     
     
     # Initialise the environment and entropy
-    E <- (sample(10:100,1)/100)
-    S <- (1)
+       
+      E <- (sample(10:100,1)/100)
+      S <- (1)
   
 
   for (t in 1:t_max) {
 
-     options(dplyr.summarise.inform = FALSE)
+       options(dplyr.summarise.inform = FALSE)
     
     ###place gurus
     
-     g <- sum(population$openness == 1)
-     g2 <- (10-g)
-    
-    
-    ifelse(g < 10, population[1:g2,4] <- 1, population$openness)
-    
- 
+       g <- sum(population$openness == 1)
+       g2 <- (10-g)
+      
+      
+       ifelse(g < 10, population[1:g2,4] <- 1, population$openness)
+      
+   
     
     
     
@@ -1978,69 +1980,60 @@ hyp3nosocial <- function(N, t_max, r_max, energypenalty, mean, sd) {
       
       population$upddiff <- sqrt((E - population$behaviour)^2)/100
       
-
- 
-    
      
   # 2. CALCULATE FITNESS
 
-         
-    population$fitness <- 1
+      population$fitness <- 1
     
     #energypentalty relative to outer entropy
   
-    P <- energypenalty+(energypenalty*(S/100))
-    
-    population$free_enrg <- population$free_enrg/100
-    population$change <- population$change/100
+      P <- energypenalty+(energypenalty*(S/100))
+      
+      population$free_enrg <- population$free_enrg/100
+      population$change <- population$change/100
     
     #penalty for prediction error
-    population$fitness <- population$fitness - (population$free_enrg*P)
+      
+      population$fitness <- population$fitness - (population$free_enrg*P)
+     
     #penalty for energy for changing
-    population$fitness <- population$fitness - (population$change*P)
+    
+      population$fitness <- population$fitness - (population$change*P)
+   
     #penalty for updated difference
-    population$fitness <-  population$fitness - (population$upddiff*P)
-  
-
+   
+      population$fitness <-  population$fitness - (population$upddiff*P)
   
     
   #controlling for negative fitnesses
    
-    population$fitness <-  ifelse(population$fitness<0, 0, population$fitness)
-  
-    population$fitness <- population$fitness + 1
-  
-  
-  
+      population$fitness <-  ifelse(population$fitness<0, 0, population$fitness)
+    
+      population$fitness <- population$fitness + 1
   
   
     ##status
     
-     x = 1
-     result <- vector(length=length(population$behaviour))
-      for (num in population$behaviour) {
-        result[x] <- sum(population$behaviour == num)
-        x <- x + 1 
-        }
+       x = 1
+       result <- vector(length=length(population$behaviour))
+       for (num in population$behaviour) {
+       result[x] <- sum(population$behaviour == num)
+       x <- x + 1 
+          }
           
-      population$status <- result
-      population$status <-  ifelse(population$openness ==1, 100, population$status)
+       population$status <- result
+       population$status <-  ifelse(population$openness ==1, 100, population$status)
            
       
-      population$status <- population$status/10
+       population$status <- population$status/10
       
-      #Status penalty for mental illness/rigidity/social iso
+     #Status penalty for mental illness/rigidity/social iso
       
-      population$status <-population$status-(1-population$openness)
-      population$status <-  ifelse(population$status<0, 0, population$status)
+       population$status <-population$status-(1-population$openness)
+       population$status <-  ifelse(population$status<0, 0, population$status)
 
 
-
-
-
-  
-  
-      # 4. Store population characteristics in output
+   # 4. Store population characteristics in output
       
       output[output$generation == t & output$run == r, ]$W <-mean(population$fitness)
       output[output$generation == t & output$run == r, ]$O <- mean(population$openness)
@@ -2048,43 +2041,40 @@ hyp3nosocial <- function(N, t_max, r_max, energypenalty, mean, sd) {
       output[output$generation == t & output$run == r, ]$B <- mean(population$behaviour)
       output[output$generation == t & output$run == r, ]$S <- S
       output[output$generation == t & output$run == r, ]$sd <- sd(population$openness)
-             output[output$generation == t & output$run == r, ]$E <- E
+      output[output$generation == t & output$run == r, ]$E <- E
 
  
      
-      
-      
-      # 5. REPRODUCTION
+   # 5. REPRODUCTION
       
       previous_population <- population
       
     
       #copy behaviour based on fitness and status 
       
-      population$openness <- 
-      sample(previous_population$openness, size = N, replace = TRUE, prob = previous_population$fitness)
+        population$openness <- 
+        sample(previous_population$openness, size = N, replace = TRUE, prob = previous_population$fitness)
       
-  
 
       #behaviour replication
       
-      previous_population$copyprob <- previous_population$fitness+previous_population$status
-
-      population$behaviour <- 
-      sample(previous_population$behaviour, size = N, replace = T, prob = previous_population$copyprob)
+        previous_population$copyprob <- previous_population$fitness+previous_population$status
+  
+        population$behaviour <- 
+        sample(previous_population$behaviour, size = N, replace = T, prob = previous_population$copyprob)
 
       
      
-      groupmean <- NA
-      groupmeans <- NA
+        groupmean <- NA
+        groupmeans <- NA
       
       
 
-     # 6. Potential environmental change
+     # 6. Environmental change
       
-     E <- E +  1
-     S <- S+(0.5*E)
-     
+       E <- E +  1
+       S <- S+(0.5*E)
+       
       
   }
   
