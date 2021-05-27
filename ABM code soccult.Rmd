@@ -864,14 +864,15 @@ quantile(NEO$scaledo)
       (
       pp_check(m1_prior, nsamples = 1000) 
       )
+     
+     summary(m1_prior)
 
 
-hypothesis(m1, "population_typeRigid < population_typeOpen")
-hypothesis(m1, "population_typeOpen > population_typeRigid")
-hypothesis(m1, "population_typeRigid < population_typeNormal")
-hypothesis(m1, "population_typeRigid > population_typeNormal")
-hypothesis(m1, "population_typeOpen < population_typeNormal")
-hypothesis(m1, "population_typeOpen > population_typeNormal")
+hypothesis(m1_prior, "population_typeRigid = 0")
+hypothesis(m1_prior, "population_typeOpen = 0")
+hypothesis(m1_prior, "population_typeOpen > 0")
+hypothesis(m1_prior, "population_typeOpen - population_typeRigid = 0")
+
 
 
 ```
